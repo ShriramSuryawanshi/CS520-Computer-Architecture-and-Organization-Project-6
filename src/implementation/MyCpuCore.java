@@ -44,11 +44,12 @@ public class MyCpuCore extends CpuCore {
 // Set all ARF entries as USED and VALID
         // @shree - initializing rat
         IGlobals globals = (GlobalData) getCore().getGlobals();
-        IRegFile regfile = globals.getRegisterFile();
+        IRegFile arf = globals.getRegisterFile();
 
         for (int i = 0; i < 32; i++) {
-            GlobalData.rat[i] = i;
-            regfile.markUsed(i, true);
+            GlobalData.rat[i] = -1;
+            arf.markUsed(i, true);
+            arf.markInvalid(i);
         }
 
         for (int i = 0; i < 256; i++) {
@@ -99,9 +100,11 @@ public class MyCpuCore extends CpuCore {
         createPipeReg("IQToFloatDiv");
         createPipeReg("IQToFloatMul");
         createPipeReg("IQToIntDiv");
+        createPipeReg("IQToBranchResUnit");
         createPipeReg("ExecuteToWriteback");
         createPipeReg("FDivToWriteback");
         createPipeReg("IDivToWriteback");
+        createPipeReg("BranchResUnitToWriteback");
         // createPipeReg("MemoryToWriteback");
 
         //createPipeReg("ExecuteToWriteback");
@@ -116,6 +119,7 @@ public class MyCpuCore extends CpuCore {
         addPipeStage(new FloatDiv(this));
         addPipeStage(new IntDiv(this));
         addPipeStage(new IssueQueue(this));
+        addPipeStage(new BranchResUnit(this));
 
         //  addPipeStage(new AllMyStages.Memory(this));
         addPipeStage(new Writeback(this));
@@ -149,6 +153,7 @@ public class MyCpuCore extends CpuCore {
         connect("IssueQueue", "IQToMemory", "MemUnit");
         connect("IssueQueue", "IQToIntDiv", "IntDiv");
         connect("IssueQueue", "IQToFloatDiv", "FloatDiv");
+        connect("IssueQueue", "IQToBranchResUnit", "BranchResUnit");
 
         connect("IssueQueue", "IQToIntMul", "IntMul");
         connect("IssueQueue", "IQToFloatAddSub", "FloatAddSub");
@@ -161,6 +166,7 @@ public class MyCpuCore extends CpuCore {
         connect("Execute", "ExecuteToWriteback", "Writeback");
         connect("IntDiv", "IDivToWriteback", "Writeback");
         connect("FloatDiv", "FDivToWriteback", "Writeback");
+        connect("BranchResUnit", "BranchResUnitToWriteback", "Writeback");
         connect("FloatAddSub", "Writeback");
         connect("FloatMul", "Writeback");
         connect("IntMul", "Writeback");
@@ -172,6 +178,7 @@ public class MyCpuCore extends CpuCore {
         addForwardingSource("ExecuteToWriteback");
         addForwardingSource("IDivToWriteback");
         addForwardingSource("FDivToWriteback");
+        addForwardingSource("BranchResUnitToWriteback");
 
         //   addForwardingSource("MemoryToWriteback");
         // MSFU.specifyForwardingSources is where this forwarding source is added

@@ -36,24 +36,14 @@ public class IntDiv extends PipelineStageBase {
         super(core, "IntDiv");
     }
 
-    /*public IntDiv(IModule parent, String name) {
-        super(parent, name);
-    }*/
-
- /* private static class MyMathUnit extends PipelineStageBase {
-        
-
-        public MyMathUnit(IModule parent) {
-            // For simplicity, we just call this stage "in".
-            super(parent, "in");
-//            super(parent, "in:Math");  // this would be fine too
-        }
-     */
     @Override
     public void compute(Latch input, Latch output) {
         if (input.isNull()) {
             return;
         }
+
+        IGlobals globals = (GlobalData) getCore().getGlobals();
+
         doPostedForwarding(input);
         InstructionBase ins = input.getInstruction();
 
@@ -69,6 +59,10 @@ public class IntDiv extends PipelineStageBase {
 
         }
 
+        if (globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_FLUSH) {
+            GlobalData.MSFD_cnt = 15;
+        }
+
         if (GlobalData.MSID_cnt < 15) {
             GlobalData.MSID_cnt++;
             setResourceWait("Loop" + GlobalData.MSID_cnt);
@@ -80,32 +74,3 @@ public class IntDiv extends PipelineStageBase {
         output.setInstruction(ins);
     }
 }
-
-/*
-    @Override
-    public void createPipelineRegisters() {
-        createPipeReg("MathToDelay");
-    }
-
-    @Override
-    public void createPipelineStages() {
-        addPipeStage(new MyMathUnit(this));
-    }
-
-    @Override
-    public void createChildModules() {
-        IFunctionalUnit child = new MultiStageDelayUnit(this, "Delay", 15);
-        addChildUnit(child);
-    }
-
-    @Override
-    public void createConnections() {
-        addRegAlias("Delay.out", "out");
-        connect("in", "MathToDelay", "Delay");
-    }
-
-    @Override
-    public void specifyForwardingSources() {
-        addForwardingSource("out");
-    }
- */
