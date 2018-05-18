@@ -48,8 +48,8 @@ public class MyCpuCore extends CpuCore {
         IRegFile arf = globals.getPropertyRegisterFile(ARCH_REG_FILE);
 
         for (int i = 0; i < 32; i++) {
-            GlobalData.rat[i] = -1;
-            arf.changeFlags(i, 4, 1);
+            GlobalData.rat[i] = i;
+            arf.changeFlags(i, IRegFile.SET_USED, IRegFile.SET_INVALID);
         }
 
         for (int i = 0; i < 256; i++) {
@@ -78,8 +78,9 @@ public class MyCpuCore extends CpuCore {
             String RegNames = "";
             for (int i = 0; i < 256; i++) {
 
-                if ((!regfile.isInvalid(i)) && (regfile.isRenamed(i)) && (regfile.isUsed(i))) {
-                    regfile.markUsed(i, false);
+                if (!regfile.isInvalid(i) && regfile.isRenamed(i) && regfile.isUsed(i)) {
+                    //regfile.markUsed(i, false);
+                    regfile.changeFlags(i, 0, IRegFile.CLEAR_USED);
 
                     RegNames = RegNames + " P" + i;
                 }
@@ -96,16 +97,18 @@ public class MyCpuCore extends CpuCore {
     @Override
     public void createPipelineRegisters() {
         createPipeReg("FetchToDecode");
+        
         createPipeReg("DecodeToIQ");
-
-        createPipeReg("IQToExecute");
         createPipeReg("DecodeToLSQ");
+        
+        createPipeReg("IQToExecute");
         createPipeReg("IQToIntMul");
         createPipeReg("IQToFloatAddSub");
         createPipeReg("IQToFloatDiv");
         createPipeReg("IQToFloatMul");
         createPipeReg("IQToIntDiv");
         createPipeReg("IQToBranchResUnit");
+        
         createPipeReg("ExecuteToWriteback");
         createPipeReg("FDivToWriteback");
         createPipeReg("IDivToWriteback");
@@ -127,6 +130,8 @@ public class MyCpuCore extends CpuCore {
         addPipeStage(new IssueQueue(this));
         addPipeStage(new BranchResUnit(this));       
         addPipeStage(new Writeback(this));
+        addPipeStage(new BranchResUnit(this));
+        addPipeStage(new Retirement(this));
     }
 
     @Override

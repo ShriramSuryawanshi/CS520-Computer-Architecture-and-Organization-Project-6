@@ -59,6 +59,7 @@ public class AllMyStages {
         // stage?  Note that this is computed only for display and debugging
         // purposes.
         boolean has_work;
+        boolean shutting_down = false;
 
         /**
          * For Fetch, this method only has diagnostic value. However,
@@ -83,11 +84,43 @@ public class AllMyStages {
 
         @Override
         public void compute(Latch input, Latch output) {
+
+            if (shutting_down) {
+                addStatusWord("Shutting down");
+                setActivity("");
+                return;
+            }
+
             IGlobals globals = (GlobalData) getCore().getGlobals();
+
+            if (globals.getPropertyInteger("cpu_run_state") == GlobalData.RUN_STATE_FAULT) {
+                setResourceWait("cpu_run_state");
+            }
+
+            if (globals.getPropertyInteger("cpu_run_state") == GlobalData.RUN_STATE_RECOVERY) {
+                int pc = globals.getPropertyInteger("recovery_pc");
+                InstructionBase ins = globals.getInstructionAt(pc);
+                globals.setClockedProperty(PROGRAM_COUNTER, pc);
+                globals.setClockedProperty(RECOVERY_TAKEN, pc);
+            }
 
             // Get the PC and fetch the instruction
             int pc_no_branch = globals.getPropertyInteger(PROGRAM_COUNTER);
             InstructionBase ins = globals.getInstructionAt(pc_no_branch);
+
+            has_work = false;
+
+            if (ins.isNull()) {
+                // Fetch is working on no instruction at no address
+                setActivity("");
+            } else {
+                // Since there is no input pipeline register, we have to inform
+                // the diagnostic helper code explicitly what instruction Fetch
+                // is working on.
+                has_work = true;
+                output.setInstruction(ins);
+                setActivity(ins.toString());
+            }
 
             int branch_state_fetch = globals.getPropertyInteger("branch_state_fetch");
             int reg_branch_target = globals.getPropertyInteger(REG_BRANCH_TARGET);
@@ -111,12 +144,12 @@ public class AllMyStages {
                         output.setInstruction(ins);
                         output.setProperty(LOOKUP_BRANCH_TARGET, 0);
                         globals.setClockedProperty("branch_state_fetch", GlobalData.BRANCH_STATE_WAITING);
-                        ins.setBranchPrediction(InstructionBase.EnumBranch.TAKEN);
                         this.setResourceWait(oper0.getRegisterName());
 
                     } else {
                         globals.setClockedProperty("branch_state_fetch", GlobalData.BRANCH_STATE_NULL);
                         globals.setProperty(PROGRAM_COUNTER, ins.getLabelTarget().getAddress());
+                        ins.setBranchPrediction(InstructionBase.EnumBranch.TAKEN);
                     }
 
                     break;
@@ -127,12 +160,12 @@ public class AllMyStages {
                         output.setInstruction(ins);
                         output.setProperty(LOOKUP_BRANCH_TARGET, 1);
                         globals.setClockedProperty("branch_state_fetch", GlobalData.BRANCH_STATE_WAITING);
-                        ins.setBranchPrediction(InstructionBase.EnumBranch.TAKEN);
                         this.setResourceWait(oper0.getRegisterName());
 
                     } else {
                         globals.setClockedProperty("branch_state_fetch", GlobalData.BRANCH_STATE_NULL);
                         globals.setProperty(PROGRAM_COUNTER, ins.getLabelTarget().getAddress());
+                        ins.setBranchPrediction(InstructionBase.EnumBranch.TAKEN);
                     }
 
                     break;
@@ -153,6 +186,7 @@ public class AllMyStages {
                             ins.setBranchPrediction(InstructionBase.EnumBranch.TAKEN);
                         } else {
                             ins.setBranchPrediction(InstructionBase.EnumBranch.NOT_TAKEN);
+                            globals.setClockedProperty(PROGRAM_COUNTER, pc_no_branch + 1);
                         }
                         break;
                     }
@@ -167,24 +201,11 @@ public class AllMyStages {
 
             // Initialize this status flag to assume a stall or bubble condition
             // by default.
-            has_work = false;
-
+            //    has_work = false;
             // If the instruction is NULL (like we ran off the end of the
             // program), just return.  However, for diagnostic purposes,
             // we make sure something meaningful appears when 
             // CpuSimulator.printStagesEveryCycle is set to true.
-            if (ins.isNull()) {
-                // Fetch is working on no instruction at no address
-                setActivity("");
-            } else {
-                // Since there is no input pipeline register, we have to inform
-                // the diagnostic helper code explicitly what instruction Fetch
-                // is working on.
-                has_work = true;
-                output.setInstruction(ins);
-                setActivity(ins.toString());
-            }
-
             // If the output cannot accept work, then 
             if (!output.canAcceptWork()) {
                 return;
@@ -264,8 +285,7 @@ public class AllMyStages {
                 return;
             }
 
-            Logger.out.println("%% ROB head " + rob_head + ": state= " + globals.getPropertyInteger(IProperties.CPU_RUN_STATE) + " ins=" + ins.toString());
-
+            //Logger.out.println("%% ROB head " + rob_head + ": state= " + globals.getPropertyInteger(IProperties.CPU_RUN_STATE) + " ins=" + ins.toString());
             EnumOpcode opcode = ins.getOpcode();
             Operand oper0 = ins.getOper0();
             IRegFile regfile = globals.getRegisterFile();
@@ -291,16 +311,14 @@ public class AllMyStages {
 //                    ins.getOper0().rename(GlobalData.rat[ins.getOper0().getRegisterNumber()]);
 //                }
 //            }
-            int available_reg = 0;
+            int available_reg = -1;
             // @shree - getting availble physical register
-            if (!opcode.oper0IsSource()) {
 
-                for (int i = 0; i <= 256; i++) {
+            for (int i = 0; i <= 256; i++) {
 
-                    if (!regfile.isUsed(i)) {
-                        available_reg = i;
-                        break;
-                    }
+                if (!regfile.isUsed(i)) {
+                    available_reg = i;
+                    break;
                 }
             }
 
@@ -336,13 +354,12 @@ public class AllMyStages {
 
             switch (opcode) {
 
-                case BRA:
-                    if (!oper0.hasValue()) {
-                        this.setResourceWait(oper0.getRegisterName());
-                        output_num = lookupOutput("DecodeToIQ");
-                        output = this.newOutput(output_num);
-                        return;
-                    }
+                case CALL:
+                    Operand pc = Operand.newRegister(Operand.PC_REGNUM);
+                    pc.setIntValue(ins.getPCAddress());
+                    ins.setSrc1(pc);
+                    ins.setSrc2(Operand.newLiteralSource(1));
+                    break;
 
                 case LOAD:
                 case STORE:
@@ -355,6 +372,7 @@ public class AllMyStages {
 
                     output_num = lookupOutput("DecodeToIQ");
                     output = this.newOutput(output_num);
+                    break;
             }
 
             if (ins.getOpcode() == EnumOpcode.HALT) {
@@ -376,10 +394,6 @@ public class AllMyStages {
 //                    ins.getOper0().rename(available_reg);
 //                }
 //            }
-            if (!output.canAcceptWork()) {
-                return;
-            }
-
             if (opcode.needsWriteback()) {
 
                 // @shree - renaming the destination
@@ -387,12 +401,16 @@ public class AllMyStages {
 
                     //regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
                     // regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT | IRegFile.CLEAR_UNMAPPED);
-                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": R" + GlobalData.rat[oper0.getRegisterNumber()] + " unlinked, P" + available_reg + " allocated");
+                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
 
                     GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
                     ins.getOper0().rename(available_reg);
                     regfile.markNewlyAllocated(available_reg);
                 }
+            }
+
+            if (!output.canAcceptWork()) {
+                return;
             }
 
             // Copy the forward# properties

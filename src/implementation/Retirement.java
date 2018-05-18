@@ -52,7 +52,7 @@ public class Retirement extends PipelineStageBase {
             globals.setClockedProperty(ROB_HEAD, rob_tail);
 
             for (int i = 0; i < 32; i++) {
-                GlobalData.rat[i] = -1;
+                //GlobalData.rat[i] = -1;
             }
 
         }
