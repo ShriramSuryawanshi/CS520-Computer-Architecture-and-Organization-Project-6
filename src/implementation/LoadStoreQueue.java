@@ -136,14 +136,14 @@ public class LoadStoreQueue extends PipelineStageBase {
 
         for (int i = 0; i < 32; i++) {
 
-            if (i == 31 && !GlobalData.IQ[i].equals("NULL")) {
+            if (i == 31 && !GlobalData.LSQ[i].equals("NULL")) {
                 addStatusWord("LSQ Full");
                 System.exit(0);
             }
 
             if (GlobalData.LSQ[i].equals("NULL") && !ins.isNull()) {
                 GlobalData.LSQ[i] = input.getInstruction().toString();
-                GlobalData.latches[i] = input;
+                GlobalData.latchesLSQ[i] = input;
                 getCore().incIssued();
                 issued = i;
                 input.consume();
@@ -155,7 +155,7 @@ public class LoadStoreQueue extends PipelineStageBase {
 
             if (!GlobalData.LSQ[i].equals("NULL")) {
 
-                ins = GlobalData.latches[i].getInstruction();
+                ins = GlobalData.latchesLSQ[i].getInstruction();
                 total_ins++;
 
                 Latch output;
@@ -175,9 +175,9 @@ public class LoadStoreQueue extends PipelineStageBase {
                 //   forwardingSearch(GlobalData.latches[i]);
                 ICpuCore core = getCore();
 
-                GlobalData.latches[i].deleteProperty("forward0");
-                GlobalData.latches[i].deleteProperty("forward1");
-                GlobalData.latches[i].deleteProperty("forward2");
+                GlobalData.latchesLSQ[i].deleteProperty("forward0");
+                GlobalData.latchesLSQ[i].deleteProperty("forward1");
+                GlobalData.latchesLSQ[i].deleteProperty("forward2");
 
                 Set<String> fwdSources = core.getForwardingSources();
                 // Put operands into array because we will loop over them,
@@ -242,14 +242,14 @@ public class LoadStoreQueue extends PipelineStageBase {
                                 Logger.out.printf("# Forward from " + srcFoundIn + " this cycle to IQ: op" + sn + " of " + ins.toString() + "\n");
 
                                 if (issued != i) {
-                                    GlobalData.IQ[i] = GlobalData.latches[i].getInstruction().toString();
+                                    GlobalData.LSQ[i] = GlobalData.latchesLSQ[i].getInstruction().toString();
                                 }
                             }
 
                         } else {
 
                             String propname = "forward" + sn;
-                            GlobalData.latches[i].setProperty(propname, srcFoundIn);
+                            GlobalData.latchesLSQ[i].setProperty(propname, srcFoundIn);
 
                         }
                     }
@@ -269,7 +269,7 @@ public class LoadStoreQueue extends PipelineStageBase {
                     }
 
                     String propname = "forward" + sn;
-                    if (!GlobalData.latches[i].hasProperty(propname)) {
+                    if (!GlobalData.latchesLSQ[i].hasProperty(propname)) {
                         // If any source operand is not available
                         // now or on the next cycle, then stall.
 
@@ -281,9 +281,9 @@ public class LoadStoreQueue extends PipelineStageBase {
                 if (flag) {
 
                     if (issued == i) {
-                        instructions = instructions + GlobalData.IQ[i] + " [new] \n";
+                        instructions = instructions + GlobalData.LSQ[i] + " [new] \n";
                     } else if (issued != i) {
-                        instructions = instructions + GlobalData.IQ[i] + " \n";
+                        instructions = instructions + GlobalData.LSQ[i] + " \n";
                     }
 
                     stall_ins++;
@@ -299,24 +299,24 @@ public class LoadStoreQueue extends PipelineStageBase {
                 if (CpuSimulator.printForwarding) {
                     for (int sn = 0; sn < 3; sn++) {
                         String propname = "forward" + sn;
-                        if (GlobalData.latches[i].hasProperty(propname)) {
+                        if (GlobalData.latchesLSQ[i].hasProperty(propname)) {
                             String operName = PipelineStageBase.operNames[sn];
-                            String srcFoundIn = GlobalData.latches[i].getPropertyString(propname);
+                            String srcFoundIn = GlobalData.latchesLSQ[i].getPropertyString(propname);
                             String srcRegName = operArray[sn].getRegisterName();
                             Logger.out.printf("# Posting forward from " + srcFoundIn + " next cycle to " + destination + " op" + sn + " of " + ins.toString() + "\n");
                         }
                     }
                 }
 
-                output.copyAllPropertiesFrom(GlobalData.latches[i]);
+                output.copyAllPropertiesFrom(GlobalData.latchesLSQ[i]);
                 output.setInstruction(ins);
                 output.write();
                 getCore().incDispatched();
 
                 if (issued == i) {
-                    instructions = instructions + GlobalData.IQ[i] + " [new] [selected] \n";
+                    instructions = instructions + GlobalData.LSQ[i] + " [new] [selected] \n";
                 } else if (issued != i) {
-                    instructions = instructions + GlobalData.IQ[i] + " [selected] \n";
+                    instructions = instructions + GlobalData.LSQ[i] + " [selected] \n";
                 }
 
                 if (ins.getOpcode() == EnumOpcode.FDIV) {
@@ -324,26 +324,26 @@ public class LoadStoreQueue extends PipelineStageBase {
                 }
 
                 sent_ins++;
-                GlobalData.IQ[i] = "NULL";
+                GlobalData.LSQ[i] = "NULL";
 
             }
         }
 
-        for (int a = 0; a < 256; a++) {
+        for (int a = 0; a < 32; a++) {
 
-            if (!GlobalData.IQ[a].equals("NULL")) {
+            if (!GlobalData.LSQ[a].equals("NULL")) {
                 continue;
 
             } else {
 
-                for (int b = a; b < 256; b++) {
+                for (int b = a; b < 32; b++) {
 
-                    if (GlobalData.IQ[b].equals("NULL")) {
+                    if (GlobalData.LSQ[b].equals("NULL")) {
                         continue;
                     } else {
-                        GlobalData.IQ[a] = GlobalData.IQ[b];
-                        GlobalData.IQ[b] = "NULL";
-                        GlobalData.latches[a] = GlobalData.latches[b];
+                        GlobalData.LSQ[a] = GlobalData.LSQ[b];
+                        GlobalData.LSQ[b] = "NULL";
+                        GlobalData.latchesLSQ[a] = GlobalData.latchesLSQ[b];
                         break;
                     }
                 }

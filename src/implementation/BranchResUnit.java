@@ -47,6 +47,7 @@ public class BranchResUnit extends PipelineStageBase {
             case JMP:
 
                 output.setInstruction(ins);
+                output.copyAllPropertiesFrom(input);
                 break;
 
             case CALL:
@@ -101,6 +102,7 @@ public class BranchResUnit extends PipelineStageBase {
         }
 
         output.setInstruction(ins);
+        output.copyAllPropertiesFrom(input);
     }
 
 }

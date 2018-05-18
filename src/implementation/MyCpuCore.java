@@ -48,7 +48,7 @@ public class MyCpuCore extends CpuCore {
         IRegFile arf = globals.getPropertyRegisterFile(ARCH_REG_FILE);
 
         for (int i = 0; i < 32; i++) {
-            GlobalData.rat[i] = -1;
+            GlobalData.rat[i] = i;
             arf.changeFlags(i, 4, 1);
         }
 

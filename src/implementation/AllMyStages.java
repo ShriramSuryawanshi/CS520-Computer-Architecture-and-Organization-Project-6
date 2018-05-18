@@ -305,7 +305,7 @@ public class AllMyStages {
                 // @shree - renaming the destination
                 if (ins.getOper0().isRegister()) {
 
-                    regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
+                    //regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
                     regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT | IRegFile.CLEAR_UNMAPPED);
 
                     Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
