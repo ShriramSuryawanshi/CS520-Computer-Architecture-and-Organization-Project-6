@@ -45,12 +45,11 @@ public class MyCpuCore extends CpuCore {
         // @shree - initializing rat
         IGlobals globals = (GlobalData) getCore().getGlobals();
         IRegFile RegFile = globals.getRegisterFile();
+        IRegFile arf = globals.getPropertyRegisterFile(ARCH_REG_FILE);
 
         for (int i = 0; i < 32; i++) {
-            //GlobalData.rat[i] = -1;
-            GlobalData.rat[i] = i;
-            RegFile.markUsed(i, true);
-           // arf.markInvalid(i);
+            GlobalData.rat[i] = -1;
+            arf.changeFlags(i, 4, 1);
         }
 
         for (int i = 0; i < 256; i++) {
