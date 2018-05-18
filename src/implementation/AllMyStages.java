@@ -148,6 +148,9 @@ public class AllMyStages {
                         if (ins.getLabelTarget().getAddress() < pc_no_branch) {
                             globals.setClockedProperty("branch_state_fetch", GlobalData.BRANCH_STATE_NULL);
                             globals.setProperty(PROGRAM_COUNTER, ins.getLabelTarget().getAddress());
+                            ins.setBranchResolution(InstructionBase.EnumBranch.TAKEN);
+                        } else {
+                            ins.setBranchResolution(InstructionBase.EnumBranch.NOT_TAKEN);
                         }
                         break;
                     }
@@ -240,18 +243,20 @@ public class AllMyStages {
             input = input.duplicate();
             InstructionBase ins = input.getInstruction();
 
+            setActivity(ins.toString());
+
             int rob_head = globals.getPropertyInteger(ROB_HEAD);
             int rob_tail = globals.getPropertyInteger(ROB_TAIL);
+
+            ins.setReorderBufferIndex(rob_tail);
+            globals.setClockedProperty(ROB_USED, ins);
+            globals.setClockedProperty(ROB_TAIL, rob_tail + 1);
 
             if (((rob_tail + 1) & 255) == rob_head) {
                 setResourceWait("ROB Full!");
                 return;
             }
-
-            // Default to no squashing.
-            //squashing_instruction = false;
-            setActivity(ins.toString());
-
+            
             if (ins.isNull()) {
                 return;
             }
@@ -295,6 +300,22 @@ public class AllMyStages {
                 }
             }
 
+            if (!opcode.oper0IsSource()) {
+
+                // @shree - renaming the destination
+                if (ins.getOper0().isRegister()) {
+
+                    regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
+                    regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT | IRegFile.CLEAR_UNMAPPED);
+
+                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
+
+                    GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
+                    ins.getOper0().rename(available_reg);
+                    regfile.markNewlyAllocated(available_reg);
+                }
+            }
+
 //            if (ins.getOpcode() == EnumOpcode.CALL) {
 //
 //                if (ins.getOper0().isRegister()) {
@@ -309,7 +330,6 @@ public class AllMyStages {
 //                    ins.getOper0().rename(available_reg);
 //                }
 //            }
-
             // See what operands can be fetched from the register file
             registerFileLookup(input);
 
@@ -354,22 +374,21 @@ public class AllMyStages {
                 shutting_down = true;
             }
 
-            if (!opcode.oper0IsSource()) {
-
-                // @shree - renaming the destination
-                if (ins.getOper0().isRegister()) {
-
-                    regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
-                    regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT);
-                    regfile.markUnmapped(available_reg, false);
-
-                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
-
-                    GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
-                    ins.getOper0().rename(available_reg);
-                }
-            }
-
+//            if (!opcode.oper0IsSource()) {
+//
+//                // @shree - renaming the destination
+//                if (ins.getOper0().isRegister()) {
+//
+//                    regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
+//                    regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT);
+//                    regfile.markUnmapped(available_reg, false);
+//
+//                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
+//
+//                    GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
+//                    ins.getOper0().rename(available_reg);
+//                }
+//            }
             if (!output.canAcceptWork()) {
                 return;
             }

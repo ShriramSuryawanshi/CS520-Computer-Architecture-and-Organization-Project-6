@@ -79,7 +79,7 @@ public class MyCpuCore extends CpuCore {
             String RegNames = "";
             for (int i = 0; i < 256; i++) {
 
-                if ((!regfile.isInvalid(i)) && (regfile.isRenamed(i)) && (regfile.isUsed(i))) {
+                if ((!regfile.isInvalid(i)) && (regfile.isUnmapped(i)) && (regfile.isUsed(i))) {
                     regfile.markUsed(i, false);
 
                     RegNames = RegNames + " P" + i;

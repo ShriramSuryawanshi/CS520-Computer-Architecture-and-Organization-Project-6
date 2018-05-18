@@ -137,6 +137,7 @@ public class IssueQueue extends PipelineStageBase {
                     //output_num = lookupOutput("IQToMemory");
                     // output = this.newOutput(output_num);
                     //destination = "in:Addr:";
+                    
                 } else {
                     output_num = lookupOutput("IQToExecute");
                     output = this.newOutput(output_num);
