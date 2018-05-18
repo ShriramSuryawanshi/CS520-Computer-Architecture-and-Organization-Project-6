@@ -248,31 +248,13 @@ public class AllMyStages {
                 return;
             }
 
-            
-            
             // Default to no squashing.
-            squashing_instruction = false;
-
+            //squashing_instruction = false;
             setActivity(ins.toString());
-
-            if (globals.getPropertyBoolean("decode_squash")) {
-                // Drop the fall-through instruction.
-                globals.setClockedProperty("decode_squash", false);
-                squashing_instruction = false;
-                //setActivity("----: NULL");
-//                globals.setClockedProperty("branch_state_decode", GlobalData.BRANCH_STATE_NULL);
-
-                // Since we don't pass an instruction to the next stage,
-                // must explicitly call input.consume in the case that
-                // the next stage is busy.
-                input.consume();
-                return;
-            }
 
             if (ins.isNull()) {
                 return;
             }
-
 
             EnumOpcode opcode = ins.getOpcode();
             Operand oper0 = ins.getOper0();
@@ -305,7 +287,7 @@ public class AllMyStages {
             if (!opcode.oper0IsSource()) {
 
                 for (int i = 0; i <= 256; i++) {
-
+                    //              System.out.println(i);
                     if (!regfile.isUsed(i)) {
                         available_reg = i;
                         break;
@@ -313,31 +295,21 @@ public class AllMyStages {
                 }
             }
 
-            if (ins.getOpcode() == EnumOpcode.CALL) {
-
-                if (ins.getOper0().isRegister()) {
-
-                    regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
-                    regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT);
-                    regfile.markUnmapped(available_reg, false);
-
-                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
-
-                    GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
-                    ins.getOper0().rename(available_reg);
-                }
-            }
-
-            // This code is to prevent having more than one of the same regster
-            // as a destiation register in the pipeline at the same time.
-//            if (opcode.needsWriteback()) {
-//                int oper0reg = oper0.getRegisterNumber();
-//                if (regfile.isInvalid(oper0reg)) {
-//                    //Logger.out.println("Stall because dest R" + oper0reg + " is invalid");
-//                    setResourceWait("Dest:" + oper0.getRegisterName());
-//                    return;
+//            if (ins.getOpcode() == EnumOpcode.CALL) {
+//
+//                if (ins.getOper0().isRegister()) {
+//
+//                    regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
+//                    regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT);
+//                    regfile.markUnmapped(available_reg, false);
+//
+//                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
+//
+//                    GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
+//                    ins.getOper0().rename(available_reg);
 //                }
 //            }
+
             // See what operands can be fetched from the register file
             registerFileLookup(input);
 
@@ -351,103 +323,31 @@ public class AllMyStages {
             int value0 = 0;
             int value1 = 0;
 
-            // Find out whether or not DecodeToExecute can accept work.
-            // We do this here for CALL, which can't be allowed to do anything
-            // unless it can pass along its work to Writeback, and we pass
-            // the call return address through Execute.
-//            int d2e_output_num = lookupOutput("DecodeToIQ");
-//            Latch d2e_output = this.newOutput(d2e_output_num);
+            int output_num;
+            output_num = lookupOutput("DecodeToIQ");
+            output = this.newOutput(output_num);
+
             switch (opcode) {
+
                 case BRA:
                     if (!oper0.hasValue()) {
-                        // If we do not already have a value for the branch
-                        // condition register, must stall.
-//                        Logger.out.println("Stall BRA wants oper0 R" + oper0.getRegisterNumber());
                         this.setResourceWait(oper0.getRegisterName());
-                        // Nothing else to do.  Bail out.
-                        return;
-                    }
-                    
-
-                case JMP:
-                    // JMP is an inconditionally taken branch.  If the
-                    // label is valid, then take its address.  Otherwise
-                    // its operand0 contains the target address.
-                    if (ins.getLabelTarget().isNull()) {
-                        if (!oper0.hasValue()) {
-                            // If branching to address in register, make sure
-                            // operand is valid.
-//                            Logger.out.println("Stall JMP wants oper0 R" + oper0.getRegisterNumber());
-                            this.setResourceWait(oper0.getRegisterName());
-                            // Nothing else to do.  Bail out.
-                            return;
-                        }
-
-                        value0 = oper0.getValue();
-                    } else {
-                        value0 = ins.getLabelTarget().getAddress();
-                    }
-                    globals.setClockedProperty("program_counter_takenbranch", value0);
-      //              globals.setClockedProperty("branch_state_decode", GlobalData.BRANCH_STATE_TAKEN);
-                    globals.setClockedProperty("decode_squash", true);
-
-                    // Since we don't pass an instruction to the next stage,
-                    // must explicitly call input.consume in the case that
-                    // the next stage is busy.
-                    input.consume();
-                    return;
-
-                case CALL: 
-                    // CALL is an inconditionally taken branch.  If the
-                    // label is valid, then take its address.  Otherwise
-                    // its src1 contains the target address.
-                    if (ins.getLabelTarget().isNull()) {
-                        if (!src1.hasValue()) {
-                            // If branching to address in register, make sure
-                            // operand is valid.
-//                            Logger.out.println("Stall JMP wants oper0 R" + oper0.getRegisterNumber());
-                            this.setResourceWait(src1.getRegisterName());
-                            // Nothing else to do.  Bail out.
-                            return;
-                        }
-
-                        value1 = src1.getValue();
-                    } else {
-                        value1 = ins.getLabelTarget().getAddress();
-                    }
-
-                    // CALL also has a destination register, which is oper0.
-                    // Before we can resolve the branch, we have to make sure
-                    // that the return address can be passed to Writeback
-                    // through Execute before we go setting any globals.
-                    if (!output.canAcceptWork()) {
+                        output_num = lookupOutput("DecodeToIQ");
+                        output = this.newOutput(output_num);
                         return;
                     }
 
-                    // To get the return address into Writeback, we will
-                    // replace the instruction's source operands with the
-                    // address of the instruction and a constant 1.
-                    Operand pc_operand = Operand.newRegister(Operand.PC_REGNUM);
-                    pc_operand.setIntValue(ins.getPCAddress());
-                    ins.setSrc1(pc_operand);
-                    ins.setSrc2(Operand.newLiteralSource(1));
-                    ins.setLabelTarget(VoidLabelTarget.getVoidLabelTarget());
-                    output.setInstruction(ins);
-                    //regfile.markInvalid(oper0.getRegisterNumber());
+                case LOAD:
+                case STORE:
 
-                    globals.setClockedProperty("program_counter_takenbranch", value1);
-                    globals.setClockedProperty("branch_state_decode", GlobalData.BRANCH_STATE_TAKEN);
-                    globals.setClockedProperty("decode_squash", true);
+                    output_num = lookupOutput("DecodeToMemory");
+                    output = this.newOutput(output_num);
+                    break;
 
-                    // Do need to pass CALL to the next stage, so we do need
-                    // to stall if the next stage can't accept work, so we
-                    // do not explicitly consume the input here.  Since
-                    // this code already fills the output latch, we can
-                    // just quit. [hint for HW5]
-                    output.write();
-                    //  input.consume();
-                    return;
+                default:
 
+                    output_num = lookupOutput("DecodeToIQ");
+                    output = this.newOutput(output_num);
             }
 
             if (ins.getOpcode() == EnumOpcode.HALT) {
@@ -459,14 +359,19 @@ public class AllMyStages {
                 // @shree - renaming the destination
                 if (ins.getOper0().isRegister()) {
 
-                    regfile.markRenamed(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
-                    regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT | IRegFile.CLEAR_RENAMED);
+                    regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
+                    regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT);
+                    regfile.markUnmapped(available_reg, false);
 
                     Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
 
                     GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
                     ins.getOper0().rename(available_reg);
                 }
+            }
+
+            if (!output.canAcceptWork()) {
+                return;
             }
 
             // Copy the forward# properties

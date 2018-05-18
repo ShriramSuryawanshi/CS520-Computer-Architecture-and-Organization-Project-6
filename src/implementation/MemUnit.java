@@ -8,140 +8,84 @@ package implementation;
 import baseclasses.FunctionalUnitBase;
 import baseclasses.InstructionBase;
 import baseclasses.Latch;
-import baseclasses.ModuleBase;
 import baseclasses.PipelineStageBase;
-import baseclasses.PropertiesContainer;
-import implementation.GlobalData;
-import java.util.Map;
 import tools.MultiStageDelayUnit;
-import tools.MyALU;
+import utilitytypes.ICpuCore;
 import utilitytypes.IFunctionalUnit;
 import utilitytypes.IGlobals;
 import utilitytypes.IModule;
-import utilitytypes.IPipeReg;
-import utilitytypes.IPipeStage;
 import utilitytypes.IProperties;
 import static utilitytypes.IProperties.MAIN_MEMORY;
 import utilitytypes.Operand;
-import voidtypes.VoidProperties;
 
 /**
  *
  * @author millerti
  */
 public class MemUnit extends FunctionalUnitBase {
+    
+    
+    public static final int ACTION_ACCESS = 1;
+    public static final int ACTION_BYPASS = 2;
+    public static final int ACTION_ISSUE = 3;
+    public static final int ACTION_COMMIT = 4;
 
     public MemUnit(IModule parent, String name) {
         super(parent, "MemUnit");
     }
 
-    private static class Addr extends PipelineStageBase {
-
-        public Addr(IModule parent) {
-            super(parent, "in:Addr");
+        
+    private static class DCache1 extends PipelineStageBase {
+        public DCache1(IModule parent) {
+            super(parent, "DCache1");
+        }
+        
+        @Override
+        public void compute(Latch input, Latch output) {
+            if (input.isNull()) return;
+            doPostedForwarding(input);
+            
+            // Compute address for next stage, pass through
+            // as property on output latch.  Don't call that property
+            // "result".
+            // Also the type of LOAD or STORE is the kind of thing you would
+            // want to pass by using a property on the Latch.  Copy that
+            // property also from input to output.
+        }
+    }
+        
+    static class DCache2 extends PipelineStageBase {
+        public DCache2(IModule parent) {
+            super(parent, "DCache2");
         }
 
         @Override
         public void compute(Latch input, Latch output) {
-            if (input.isNull()) {
-                return;
-            }
-
-            doPostedForwarding(input);
+            if (input.isNull()) return;
             InstructionBase ins = input.getInstruction();
-
-            int source1 = ins.getSrc1().getValue();
-            int source2 = ins.getSrc2().getValue();
-
-            int addr = source1 + source2;
-
-            output.setProperty("address", addr);
-            output.setInstruction(ins);
+            
+            /*
+            ACCESS STORE -- Fetch data from memory
+            BYPASS STORE -- Data already forwarded from STORE in LSO.  Pass through WITHOUT accessing memory.
+            ISSUE STORE  -- Pass through to Writeback WITHOUT accessing memory.
+            COMMIT STORE -- Write data to memory.  DO NOT pass through to Writeback.
+            */
         }
     }
-
-    private static class LSQ extends PipelineStageBase {
-
-        public LSQ(IModule parent) {
-            super(parent, "LSQ");
-        }
-
-        @Override
-        public void compute(Latch input, Latch output) {
-            if (input.isNull()) {
-                return;
-            }
-
-            doPostedForwarding(input);
-
-            this.addStatusWord("Addr=" + input.getPropertyInteger("address"));
-
-            output.copyAllPropertiesFrom(input);
-            output.setInstruction(input.getInstruction());
-        }
-    }
-
-    private static class DCache extends PipelineStageBase {
-
-        public DCache(IModule parent) {
-            // For simplicity, we just call this stage "in".
-            super(parent, "DCache");
-//            super(parent, "in:Math");  // this would be fine too
-        }
-
-        @Override
-        public void compute(Latch input, Latch output) {
-            if (input.isNull()) {
-                return;
-            }
-            doPostedForwarding(input);
-
-            InstructionBase ins = input.getInstruction();
-
-            Operand oper0 = ins.getOper0();
-            int oper0val = ins.getOper0().getValue();
-            int addr = input.getPropertyInteger("address");
-
-            int value = 0;
-            IGlobals globals = (GlobalData) getCore().getGlobals();
-            int[] memory = globals.getPropertyIntArray(MAIN_MEMORY);
-
-            switch (ins.getOpcode()) {
-                case LOAD:
-                    // Fetch the value from main memory at the address
-                    // retrieved above.
-                    value = memory[addr];
-                    output.setResultValue(value);
-                    output.setInstruction(ins);
-                    addStatusWord(oper0.getRegisterName() + "=Mem[" + addr + "]");
-                    break;
-
-                case STORE:
-                    // For store, the value to be stored in main memory is
-                    // in oper0, which was fetched in Decode.
-                    memory[addr] = oper0val;
-                    addStatusWord("Mem[" + addr + "]=" + oper0.getValueAsString());
-                    output.setInstruction(ins);
-                    return;
-
-                default:
-                    throw new RuntimeException("Non-memory instruction got into Memory stage");
-            }
-        }
-    }
-
+    
+    
     @Override
     public void createPipelineRegisters() {
-        createPipeReg("AddrToLSQ");
-        createPipeReg("LsqToDcache");
+        createPipeReg("LSQToDCache1");
+        createPipeReg("DCache1ToDCache2");
         createPipeReg("out");
     }
 
     @Override
     public void createPipelineStages() {
-        addPipeStage(new Addr(this));
-        addPipeStage(new LSQ(this));
-        addPipeStage(new DCache(this));
+        addPipeStage(new LoadStoreQueue(this));
+        addPipeStage(new DCache1(this));
+        addPipeStage(new DCache2(this));
     }
 
     @Override
@@ -150,14 +94,14 @@ public class MemUnit extends FunctionalUnitBase {
 
     @Override
     public void createConnections() {
-        //addRegAlias("Delay.out", "out");
-        connect("in:Addr", "AddrToLSQ", "LSQ");
-        connect("LSQ", "LsqToDcache", "DCache");
-        connect("DCache", "out");
+        addStageAlias("LoadStoreQueue", "in");
+        connect("LoadStoreQueue", "LSQToDCache1", "DCache1");
+        connect("DCache1", "DCache1ToDCache2", "DCache2");
+        connect("DCache2", "out");
     }
 
     @Override
     public void specifyForwardingSources() {
         addForwardingSource("out");
-    }
+    }    
 }

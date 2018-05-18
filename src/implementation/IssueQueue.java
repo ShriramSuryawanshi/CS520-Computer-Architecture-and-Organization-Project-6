@@ -22,6 +22,7 @@ import tools.MyALU;
 import utilitytypes.EnumOpcode;
 import utilitytypes.ICpuCore;
 import utilitytypes.IFunctionalUnit;
+import utilitytypes.IGlobals;
 import utilitytypes.IModule;
 import utilitytypes.IPipeReg;
 import utilitytypes.IPipeStage;
@@ -40,20 +41,25 @@ public class IssueQueue extends PipelineStageBase {
         super(core, "IssueQueue");
     }
 
-    /*    public FloatDiv(IModule parent, String name) {
-        super(parent, name);
-    } */
-
- /* private static class MyMathUnit extends PipelineStageBase {
-
-/*        public MyMathUnit(IModule parent) {
-            // For simplicity, we just call this stage "in".
-            super(parent, "in");
-        }*/
     @Override
     public void compute() {
 
         Latch input = this.readInput(0).duplicate();
+
+        IGlobals globals = (GlobalData) getCore().getGlobals();
+        if (globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_FLUSH || globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_FAULT) {
+            input.consume();
+            input.setInvalid();
+
+            if (globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_FLUSH) {
+
+                for (int i = 0; i < 256; i++) {
+                    GlobalData.IQ[i] = "NULL";
+
+                }
+            }
+        }
+
         InstructionBase ins = input.getInstruction();
         String instructions = "";
 
@@ -113,6 +119,10 @@ public class IssueQueue extends PipelineStageBase {
                     output = this.newOutput(output_num);
                     destination = "in:";
 
+                } else if (opcode == EnumOpcode.BRA || opcode == EnumOpcode.CALL || opcode == EnumOpcode.JMP) {
+                    output_num = lookupOutput("IQToBranchResUnit");
+                    output = this.newOutput(output_num);
+                    
                 } else if (opcode == EnumOpcode.FMUL) {
                     output_num = lookupOutput("IQToFloatMul");
                     output = this.newOutput(output_num);
@@ -123,11 +133,10 @@ public class IssueQueue extends PipelineStageBase {
                     output = this.newOutput(output_num);
                     destination = "FloatDiv:";
 
-                } else if (opcode.accessesMemory()) {
-                    output_num = lookupOutput("IQToMemory");
-                    output = this.newOutput(output_num);
-                    destination = "in:Addr:";
-
+                    //} else if (opcode.accessesMemory()) {
+                    //output_num = lookupOutput("IQToMemory");
+                    // output = this.newOutput(output_num);
+                    //destination = "in:Addr:";
                 } else {
                     output_num = lookupOutput("IQToExecute");
                     output = this.newOutput(output_num);

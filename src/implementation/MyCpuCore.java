@@ -44,16 +44,21 @@ public class MyCpuCore extends CpuCore {
 // Set all ARF entries as USED and VALID
         // @shree - initializing rat
         IGlobals globals = (GlobalData) getCore().getGlobals();
-        IRegFile arf = globals.getRegisterFile();
+        IRegFile RegFile = globals.getRegisterFile();
 
         for (int i = 0; i < 32; i++) {
-            GlobalData.rat[i] = -1;
-            arf.markUsed(i, true);
-            arf.markInvalid(i);
+            //GlobalData.rat[i] = -1;
+            GlobalData.rat[i] = i;
+            RegFile.markUsed(i, true);
+           // arf.markInvalid(i);
         }
 
         for (int i = 0; i < 256; i++) {
             GlobalData.IQ[i] = "NULL";
+        }
+
+        for (int i = 0; i < 32; i++) {
+            GlobalData.LSQ[i] = "NULL";
         }
 
     }
@@ -93,8 +98,9 @@ public class MyCpuCore extends CpuCore {
     public void createPipelineRegisters() {
         createPipeReg("FetchToDecode");
         createPipeReg("DecodeToIQ");
+
         createPipeReg("IQToExecute");
-        createPipeReg("IQToMemory");
+        createPipeReg("DecodeToMemory");
         createPipeReg("IQToIntMul");
         createPipeReg("IQToFloatAddSub");
         createPipeReg("IQToFloatDiv");
@@ -149,8 +155,9 @@ public class MyCpuCore extends CpuCore {
         // Connect two stages through a pipelin register
         connect("Fetch", "FetchToDecode", "Decode");
         connect("Decode", "DecodeToIQ", "IssueQueue");
+
         connect("IssueQueue", "IQToExecute", "Execute");
-        connect("IssueQueue", "IQToMemory", "MemUnit");
+        connect("Decode", "DecodeToMemory", "MemUnit");
         connect("IssueQueue", "IQToIntDiv", "IntDiv");
         connect("IssueQueue", "IQToFloatDiv", "FloatDiv");
         connect("IssueQueue", "IQToBranchResUnit", "BranchResUnit");

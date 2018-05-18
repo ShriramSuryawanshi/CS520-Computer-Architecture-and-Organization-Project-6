@@ -50,6 +50,9 @@ public class GlobalData extends ClockedPropertiesContainer implements IGlobals {
     public static String[] IQ = new String[256];
     public static Latch[] latches = new Latch[256];
     public static int Fdiv_sent = -1;
+    
+    public static String[] LSQ = new String[LSQ_SIZE];
+    public static Latch[] latchesLSQ = new Latch[LSQ_SIZE];
 
     @Override
     public void setup() {
