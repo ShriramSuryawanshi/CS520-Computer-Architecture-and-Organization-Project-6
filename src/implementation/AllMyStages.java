@@ -111,6 +111,7 @@ public class AllMyStages {
                         output.setInstruction(ins);
                         output.setProperty(LOOKUP_BRANCH_TARGET, 0);
                         globals.setClockedProperty("branch_state_fetch", GlobalData.BRANCH_STATE_WAITING);
+                        ins.setBranchPrediction(InstructionBase.EnumBranch.TAKEN);
                         this.setResourceWait(oper0.getRegisterName());
 
                     } else {
@@ -126,6 +127,7 @@ public class AllMyStages {
                         output.setInstruction(ins);
                         output.setProperty(LOOKUP_BRANCH_TARGET, 1);
                         globals.setClockedProperty("branch_state_fetch", GlobalData.BRANCH_STATE_WAITING);
+                        ins.setBranchPrediction(InstructionBase.EnumBranch.TAKEN);
                         this.setResourceWait(oper0.getRegisterName());
 
                     } else {
@@ -148,9 +150,9 @@ public class AllMyStages {
                         if (ins.getLabelTarget().getAddress() < pc_no_branch) {
                             globals.setClockedProperty("branch_state_fetch", GlobalData.BRANCH_STATE_NULL);
                             globals.setProperty(PROGRAM_COUNTER, ins.getLabelTarget().getAddress());
-                            ins.setBranchResolution(InstructionBase.EnumBranch.TAKEN);
+                            ins.setBranchPrediction(InstructionBase.EnumBranch.TAKEN);
                         } else {
-                            ins.setBranchResolution(InstructionBase.EnumBranch.NOT_TAKEN);
+                            ins.setBranchPrediction(InstructionBase.EnumBranch.NOT_TAKEN);
                         }
                         break;
                     }
@@ -233,15 +235,20 @@ public class AllMyStages {
 
             Latch input = readInput(0);
             Latch output;
+
             IGlobals globals = (GlobalData) getCore().getGlobals();
+
+            input = input.duplicate();
+            InstructionBase ins = input.getInstruction();
+
+            if (ins.isNull()) {
+                return;
+            }
 
             if (GlobalData.CPU_RUN_STATE.equals("RUN_STATE_HALTING") || GlobalData.CPU_RUN_STATE.equals("RUN_STATE_HALTED") || GlobalData.CPU_RUN_STATE.equals("RUN_STATE_FAULT")) {
                 input.consume();
                 return;
             }
-
-            input = input.duplicate();
-            InstructionBase ins = input.getInstruction();
 
             setActivity(ins.toString());
 
@@ -256,10 +263,8 @@ public class AllMyStages {
                 setResourceWait("ROB Full!");
                 return;
             }
-            
-            if (ins.isNull()) {
-                return;
-            }
+
+            Logger.out.println("%% ROB head " + rob_head + ": state= " + globals.getPropertyInteger(IProperties.CPU_RUN_STATE) + " ins=" + ins.toString());
 
             EnumOpcode opcode = ins.getOpcode();
             Operand oper0 = ins.getOper0();
@@ -276,23 +281,22 @@ public class AllMyStages {
             }
 
             // @shree - Register renaming if oper0IsSource
-            if (opcode.oper0IsSource() && ins.getOpcode() != EnumOpcode.JMP) {
-                ins.getOper0().rename(GlobalData.rat[ins.getOper0().getRegisterNumber()]);
-            }
-
-            if (ins.getOpcode() == EnumOpcode.JMP) {
-
-                if (ins.getOper0().isRegister()) {
-                    ins.getOper0().rename(GlobalData.rat[ins.getOper0().getRegisterNumber()]);
-                }
-            }
-
+//            if (opcode.oper0IsSource() && ins.getOpcode() != EnumOpcode.JMP) {
+//                ins.getOper0().rename(GlobalData.rat[ins.getOper0().getRegisterNumber()]);
+//            }
+//
+//            if (ins.getOpcode() == EnumOpcode.JMP) {
+//
+//                if (ins.getOper0().isRegister()) {
+//                    ins.getOper0().rename(GlobalData.rat[ins.getOper0().getRegisterNumber()]);
+//                }
+//            }
             int available_reg = 0;
             // @shree - getting availble physical register
             if (!opcode.oper0IsSource()) {
 
                 for (int i = 0; i <= 256; i++) {
-                    //              System.out.println(i);
+
                     if (!regfile.isUsed(i)) {
                         available_reg = i;
                         break;
@@ -300,21 +304,8 @@ public class AllMyStages {
                 }
             }
 
-            if (!opcode.oper0IsSource()) {
-
-                // @shree - renaming the destination
-                if (ins.getOper0().isRegister()) {
-
-                    //regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
-                    regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT | IRegFile.CLEAR_UNMAPPED);
-
-                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": P" + GlobalData.rat[oper0.getRegisterNumber()] + " released, P" + available_reg + " allocated");
-
-                    GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
-                    ins.getOper0().rename(available_reg);
-                    regfile.markNewlyAllocated(available_reg);
-                }
-            }
+            registerFileLookup(input);
+            forwardingSearch(input);
 
 //            if (ins.getOpcode() == EnumOpcode.CALL) {
 //
@@ -331,11 +322,7 @@ public class AllMyStages {
 //                }
 //            }
             // See what operands can be fetched from the register file
-            registerFileLookup(input);
-
             // See what operands can be fetched by forwarding
-            forwardingSearch(input);
-
             Operand src1 = ins.getSrc1();
             Operand src2 = ins.getSrc2();
 
@@ -360,7 +347,7 @@ public class AllMyStages {
                 case LOAD:
                 case STORE:
 
-                    output_num = lookupOutput("DecodeToMemory");
+                    output_num = lookupOutput("DecodeToLSQ");
                     output = this.newOutput(output_num);
                     break;
 
@@ -391,6 +378,21 @@ public class AllMyStages {
 //            }
             if (!output.canAcceptWork()) {
                 return;
+            }
+
+            if (opcode.needsWriteback()) {
+
+                // @shree - renaming the destination
+                if (ins.getOper0().isRegister()) {
+
+                    //regfile.markUnmapped(GlobalData.rat[ins.getOper0().getRegisterNumber()], true);
+                    // regfile.changeFlags(available_reg, IRegFile.SET_USED | IRegFile.SET_INVALID, IRegFile.CLEAR_FLOAT | IRegFile.CLEAR_UNMAPPED);
+                    Logger.out.println("Dest R" + oper0.getRegisterNumber() + ": R" + GlobalData.rat[oper0.getRegisterNumber()] + " unlinked, P" + available_reg + " allocated");
+
+                    GlobalData.rat[oper0.getRegisterNumber()] = available_reg;
+                    ins.getOper0().rename(available_reg);
+                    regfile.markNewlyAllocated(available_reg);
+                }
             }
 
             // Copy the forward# properties

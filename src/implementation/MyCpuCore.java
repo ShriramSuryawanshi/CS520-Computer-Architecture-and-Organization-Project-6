@@ -48,7 +48,7 @@ public class MyCpuCore extends CpuCore {
         IRegFile arf = globals.getPropertyRegisterFile(ARCH_REG_FILE);
 
         for (int i = 0; i < 32; i++) {
-            GlobalData.rat[i] = i;
+            GlobalData.rat[i] = -1;
             arf.changeFlags(i, 4, 1);
         }
 
@@ -78,7 +78,7 @@ public class MyCpuCore extends CpuCore {
             String RegNames = "";
             for (int i = 0; i < 256; i++) {
 
-                if ((!regfile.isInvalid(i)) && (regfile.isUnmapped(i)) && (regfile.isUsed(i))) {
+                if ((!regfile.isInvalid(i)) && (regfile.isRenamed(i)) && (regfile.isUsed(i))) {
                     regfile.markUsed(i, false);
 
                     RegNames = RegNames + " P" + i;
@@ -99,7 +99,7 @@ public class MyCpuCore extends CpuCore {
         createPipeReg("DecodeToIQ");
 
         createPipeReg("IQToExecute");
-        createPipeReg("DecodeToMemory");
+        createPipeReg("DecodeToLSQ");
         createPipeReg("IQToIntMul");
         createPipeReg("IQToFloatAddSub");
         createPipeReg("IQToFloatDiv");
@@ -110,6 +110,7 @@ public class MyCpuCore extends CpuCore {
         createPipeReg("FDivToWriteback");
         createPipeReg("IDivToWriteback");
         createPipeReg("BranchResUnitToWriteback");
+        
         // createPipeReg("MemoryToWriteback");
 
         //createPipeReg("ExecuteToWriteback");
@@ -124,9 +125,7 @@ public class MyCpuCore extends CpuCore {
         addPipeStage(new FloatDiv(this));
         addPipeStage(new IntDiv(this));
         addPipeStage(new IssueQueue(this));
-        addPipeStage(new BranchResUnit(this));
-
-        //  addPipeStage(new AllMyStages.Memory(this));
+        addPipeStage(new BranchResUnit(this));       
         addPipeStage(new Writeback(this));
     }
 
@@ -156,7 +155,7 @@ public class MyCpuCore extends CpuCore {
         connect("Decode", "DecodeToIQ", "IssueQueue");
 
         connect("IssueQueue", "IQToExecute", "Execute");
-        connect("Decode", "DecodeToMemory", "MemUnit");
+        connect("Decode", "DecodeToLSQ", "MemUnit");
         connect("IssueQueue", "IQToIntDiv", "IntDiv");
         connect("IssueQueue", "IQToFloatDiv", "FloatDiv");
         connect("IssueQueue", "IQToBranchResUnit", "BranchResUnit");
@@ -169,10 +168,11 @@ public class MyCpuCore extends CpuCore {
         // units.  The output from MSFU is really called "MSFU.Delay.out",
         // which was aliased to "MSFU.out" so that it would be automatically
         // identified as an output from MSFU.
+        connect("BranchResUnit", "BranchResUnitToWriteback", "Writeback");
         connect("Execute", "ExecuteToWriteback", "Writeback");
         connect("IntDiv", "IDivToWriteback", "Writeback");
         connect("FloatDiv", "FDivToWriteback", "Writeback");
-        connect("BranchResUnit", "BranchResUnitToWriteback", "Writeback");
+        
         connect("FloatAddSub", "Writeback");
         connect("FloatMul", "Writeback");
         connect("IntMul", "Writeback");
@@ -184,7 +184,7 @@ public class MyCpuCore extends CpuCore {
         addForwardingSource("ExecuteToWriteback");
         addForwardingSource("IDivToWriteback");
         addForwardingSource("FDivToWriteback");
-        addForwardingSource("BranchResUnitToWriteback");
+        //addForwardingSource("BranchResUnitToWriteback");
 
         //   addForwardingSource("MemoryToWriteback");
         // MSFU.specifyForwardingSources is where this forwarding source is added
