@@ -38,9 +38,76 @@ public class LoadStoreQueue extends PipelineStageBase {
 
     // Data structures
     public void compute() {
+
+        IGlobals globals = (GlobalData) getCore().getGlobals();
+
         // First, mark any retired STORE instructions
+        Set<Integer> ret_list = getCore().getRetiredSet();
+
+        int[] retired = new int[32];
+
+        int k = 0;
+        for (Integer val : ret_list) {
+            retired[k++] = val;
+        }
+
+        Latch input = readInput(0);
 
         // Check CPU run state
+        if (globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_FAULT || globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_FLUSH || globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_HALTING) {
+            input.consume();
+            input.setInvalid();
+
+            if (globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_FLUSH || globals.getPropertyInteger(IProperties.CPU_RUN_STATE) == IProperties.RUN_STATE_HALTING) {
+
+                for (int i = 0; i < 32; i++) {
+
+                    for (int j = 0; j < 32; j++) {
+
+                        if (Integer.parseInt(GlobalData.LSQ[i].split(" ")[0].split("R")[1]) != retired[j]) {
+                            GlobalData.LSQ[i] = "NULL";
+                        }
+                    }
+                }
+            }
+        }
+        
+        for (int a = 0; a < 32; a++) {
+
+            if (!GlobalData.LSQ[a].equals("NULL")) {
+                continue;
+
+            } else {
+
+                for (int b = a; b < 32; b++) {
+
+                    if (GlobalData.LSQ[b].equals("NULL")) {
+                        continue;
+                    } else {
+                        GlobalData.LSQ[a] = GlobalData.LSQ[b];
+                        GlobalData.LSQ[b] = "NULL";
+                        GlobalData.latchesLSQ[a] = GlobalData.latchesLSQ[b];
+                        break;
+                    }
+                }
+            }
+        }
+        
+        for(int i =0; i < 32; i++) {
+            
+            for (int j =0; j < 32; j++) {
+                
+                if (retired[i] == Integer.parseInt(GlobalData.LSQ[j].split(" ")[0].split("R")[1])) {
+                    
+                    
+                    
+                }
+            }
+            
+        }
+        
+        
+
         // If the LSQ is full and a memory instruction wants to come in from
         // Decode, optionally see if you can proactively free up a retired STORE.
         // See if there's room to storea an instruction received from Decode.
@@ -121,7 +188,6 @@ public class LoadStoreQueue extends PipelineStageBase {
 
                 for (int i = 0; i < 32; i++) {
                     GlobalData.LSQ[i] = "NULL";
-
                 }
             }
         }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-private xmlns="http://www.netbeans.org/ns/project-private/1">
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/D:/Edumantra/Binghamton/1.%20Spring%202018/Computer%20Architecture%20and%20Organization/6.%20Assignment%206/Solution/shree/CpuSimulator-master/CpuSimulator-master/src/baseclasses/CpuCore.java</file>
+            <file>file:/D:/Edumantra/Binghamton/1.%20Spring%202018/Computer%20Architecture%20and%20Organization/6.%20Assignment%206/Solution/shree/CpuSimulator-master/CpuSimulator-master/src/implementation/AllMyStages.java</file>
+            <file>file:/D:/Edumantra/Binghamton/1.%20Spring%202018/Computer%20Architecture%20and%20Organization/6.%20Assignment%206/Solution/shree/CpuSimulator-master/CpuSimulator-master/src/implementation/IssueQueue.java</file>
+            <file>file:/D:/Edumantra/Binghamton/1.%20Spring%202018/Computer%20Architecture%20and%20Organization/6.%20Assignment%206/Solution/shree/CpuSimulator-master/CpuSimulator-master/src/implementation/LoadStoreQueue.java</file>
+            <file>file:/D:/Edumantra/Binghamton/1.%20Spring%202018/Computer%20Architecture%20and%20Organization/6.%20Assignment%206/Solution/shree/CpuSimulator-master/CpuSimulator-master/src/implementation/GlobalData.java</file>
+            <file>file:/D:/Edumantra/Binghamton/1.%20Spring%202018/Computer%20Architecture%20and%20Organization/6.%20Assignment%206/Solution/shree/CpuSimulator-master/CpuSimulator-master/src/implementation/MyCpuCore.java</file>
+            <file>file:/D:/Edumantra/Binghamton/1.%20Spring%202018/Computer%20Architecture%20and%20Organization/6.%20Assignment%206/Solution/shree/CpuSimulator-master/CpuSimulator-master/src/baseclasses/PipelineStageBase.java</file>
+        </group>
+    </open-files>
+</project-private>

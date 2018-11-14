@@ -102,6 +102,7 @@ public class AllMyStages {
                 InstructionBase ins = globals.getInstructionAt(pc);
                 globals.setClockedProperty(PROGRAM_COUNTER, pc);
                 globals.setClockedProperty(RECOVERY_TAKEN, pc);
+                globals.setClockedProperty("cpu_run_state", GlobalData.RUN_STATE_RUNNING);
             }
 
             // Get the PC and fetch the instruction
@@ -353,6 +354,19 @@ public class AllMyStages {
             output = this.newOutput(output_num);
 
             switch (opcode) {
+                
+                case BRA:
+                case JMP:
+                    
+                    if(input.hasProperty(LOOKUP_BRANCH_TARGET)) {
+                        
+                        if (input.getPropertyInteger(LOOKUP_BRANCH_TARGET) == 1) {
+                        
+                            System.out.println("send values to fetch");
+                        }
+                    }
+                    
+                    break;
 
                 case CALL:
                     Operand pc = Operand.newRegister(Operand.PC_REGNUM);
